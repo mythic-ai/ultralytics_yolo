@@ -35,11 +35,14 @@ class PoseTrainer(yolo.detect.DetectionTrainer):
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         """Get pose estimation model with specified configuration and weights."""
-        model = PoseModel(cfg, ch=3, nc=self.data['nc'], data_kpt_shape=self.data['kpt_shape'], verbose=verbose)
+        model = self.get_model_class()(cfg, ch=3, nc=self.data['nc'], data_kpt_shape=self.data['kpt_shape'], verbose=verbose)
         if weights:
             model.load(weights)
 
         return model
+
+    def get_model_class(self):
+        return PoseModel
 
     def set_model_attributes(self):
         """Sets keypoints shape attribute of PoseModel."""

@@ -37,12 +37,11 @@ def parse_requirements(file_path: Path):
 
 
 setup(
-    name='ultralytics',  # name of pypi package
+    name='mythic-ultralytics-yolov8',  # name of pypi package
     version=get_version(),  # version of pypi package
     python_requires='>=3.8',
     license='AGPL-3.0',
-    description=('Ultralytics YOLOv8 for SOTA object detection, multi-object tracking, instance segmentation, '
-                 'pose estimation and image classification.'),
+    description=("Ultralytics YOLOv8 with Mythic's modifications."),
     long_description=README,
     long_description_content_type='text/markdown',
     url='https://github.com/ultralytics/ultralytics',
