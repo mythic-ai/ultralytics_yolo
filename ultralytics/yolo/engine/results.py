@@ -71,9 +71,9 @@ class Results(SimpleClass):
         orig_img (numpy.ndarray): The original image as a numpy array.
         path (str): The path to the image file.
         names (dict): A dictionary of class names.
-        boxes (List[List[float]], optional): A list of bounding box coordinates for each detection.
-        masks (numpy.ndarray, optional): A 3D numpy array of detection masks, where each mask is a binary image.
-        probs (numpy.ndarray, optional): A 2D numpy array of detection probabilities for each class.
+        boxes (torch.tensor, optional): A 2D tensor of bounding box coordinates for each detection.
+        masks (torch.tensor, optional): A 3D tensor of detection masks, where each mask is a binary image.
+        probs (torch.tensor, optional): A 1D tensor of probabilities of each class for classification task.
         keypoints (List[List[float]], optional): A list of detected keypoints for each object.
 
 
@@ -82,10 +82,10 @@ class Results(SimpleClass):
         orig_shape (tuple): The original image shape in (height, width) format.
         boxes (Boxes, optional): A Boxes object containing the detection bounding boxes.
         masks (Masks, optional): A Masks object containing the detection masks.
-        probs (numpy.ndarray, optional): A 2D numpy array of detection probabilities for each class.
+        probs (Probs, optional): A Probs object containing probabilities of each class for classification task.
         names (dict): A dictionary of class names.
         path (str): The path to the image file.
-        keypoints (List[List[float]], optional): A list of detected keypoints for each object.
+        keypoints (Keypoints, optional): A Keypoints object containing detected keypoints for each object.
         speed (dict): A dictionary of preprocess, inference and postprocess speeds in milliseconds per image.
         _keys (tuple): A tuple of attribute names for non-empty attributes.
     """
@@ -101,6 +101,7 @@ class Results(SimpleClass):
         self.speed = {'preprocess': None, 'inference': None, 'postprocess': None}  # milliseconds per image
         self.names = names
         self.path = path
+        self.save_dir = None
         self._keys = ('boxes', 'masks', 'probs', 'keypoints')
 
     def __getitem__(self, idx):
@@ -355,23 +356,23 @@ class Boxes(BaseTensor):
     A class for storing and manipulating detection boxes.
 
     Args:
-        boxes (torch.Tensor) or (numpy.ndarray): A tensor or numpy array containing the detection boxes,
+        boxes (torch.Tensor | numpy.ndarray): A tensor or numpy array containing the detection boxes,
             with shape (num_boxes, 6). The last two columns should contain confidence and class values.
         orig_shape (tuple): Original image size, in the format (height, width).
 
     Attributes:
-        boxes (torch.Tensor) or (numpy.ndarray): The detection boxes with shape (num_boxes, 6).
-        orig_shape (torch.Tensor) or (numpy.ndarray): Original image size, in the format (height, width).
+        boxes (torch.Tensor | numpy.ndarray): The detection boxes with shape (num_boxes, 6).
+        orig_shape (torch.Tensor | numpy.ndarray): Original image size, in the format (height, width).
         is_track (bool): True if the boxes also include track IDs, False otherwise.
 
     Properties:
-        xyxy (torch.Tensor) or (numpy.ndarray): The boxes in xyxy format.
-        conf (torch.Tensor) or (numpy.ndarray): The confidence values of the boxes.
-        cls (torch.Tensor) or (numpy.ndarray): The class values of the boxes.
-        id (torch.Tensor) or (numpy.ndarray): The track IDs of the boxes (if available).
-        xywh (torch.Tensor) or (numpy.ndarray): The boxes in xywh format.
-        xyxyn (torch.Tensor) or (numpy.ndarray): The boxes in xyxy format normalized by original image size.
-        xywhn (torch.Tensor) or (numpy.ndarray): The boxes in xywh format normalized by original image size.
+        xyxy (torch.Tensor | numpy.ndarray): The boxes in xyxy format.
+        conf (torch.Tensor | numpy.ndarray): The confidence values of the boxes.
+        cls (torch.Tensor | numpy.ndarray): The class values of the boxes.
+        id (torch.Tensor | numpy.ndarray): The track IDs of the boxes (if available).
+        xywh (torch.Tensor | numpy.ndarray): The boxes in xywh format.
+        xyxyn (torch.Tensor | numpy.ndarray): The boxes in xyxy format normalized by original image size.
+        xywhn (torch.Tensor | numpy.ndarray): The boxes in xywh format normalized by original image size.
         data (torch.Tensor): The raw bboxes tensor
 
     Methods:
@@ -552,7 +553,7 @@ class Keypoints(BaseTensor):
     @property
     @lru_cache(maxsize=1)
     def conf(self):
-        return self.data[..., 3] if self.has_visible else None
+        return self.data[..., 2] if self.has_visible else None
 
 
 class Probs(BaseTensor):
