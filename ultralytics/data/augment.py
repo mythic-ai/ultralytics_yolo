@@ -731,7 +731,8 @@ class LetterBox:
             img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(114, 114, 114)
         )  # add border
         if labels.get("ratio_pad"):
-            labels["ratio_pad"] = (labels["ratio_pad"], (left, top))  # for evaluation
+            # for evaluation
+            labels["ratio_pad"] = ((labels['ratio_pad'][0] * r, labels['ratio_pad'][1] * r), (left, top))
 
         if len(labels):
             labels = self._update_labels(labels, ratio, dw, dh)
@@ -968,6 +969,9 @@ class Format:
 
 def v8_transforms(dataset, imgsz, hyp, stretch=False):
     """Convert images to a size suitable for YOLOv8 training."""
+    if not isinstance(imgsz, int):
+        assert imgsz[0] == imgsz[1]
+        imgsz = imgsz[0]
     pre_transform = Compose(
         [
             Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic),
