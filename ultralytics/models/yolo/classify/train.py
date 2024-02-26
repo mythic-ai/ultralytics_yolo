@@ -44,7 +44,7 @@ class ClassificationTrainer(BaseTrainer):
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         """Returns a modified PyTorch model configured for training YOLO."""
-        model = ClassificationModel(cfg, nc=self.data["nc"], verbose=verbose and RANK == -1)
+        model = self.get_model_class()(cfg, nc=self.data["nc"], verbose=verbose and RANK == -1)
         if weights:
             model.load(weights)
 
@@ -56,6 +56,9 @@ class ClassificationTrainer(BaseTrainer):
         for p in model.parameters():
             p.requires_grad = True  # for training
         return model
+
+    def get_model_class(self):
+        return ClassificationModel
 
     def setup_model(self):
         """Load, create or download model for any task."""
