@@ -186,6 +186,68 @@ class Pose(Detect):
             return y
 
 
+# These are debugging flags. Can be set to defer creation of either Pose or Segmentation head to get a model that
+# is structurally compatible with Pose or Segmentation weights. The second head should be initialized after loading
+# weights.
+SEG_POSE_INIT_SEGMENT_HEAD = True
+SEG_POSE_INIT_POSE_HEAD = True
+
+
+class SegPose(Detect):
+    """YOLOv8 Segmentation plus Pose hybrid head."""
+    def __init__(self, nc=80, nm=32, npr=256, kpt_shape=(17, 3), ch=()):
+        """Initialize YOLO network with default parameters and Convolutional Layers."""
+        super().__init__(nc, ch)
+        self.ch = ch
+
+        # Copied from Segment
+        self.nm = nm  # number of masks
+        self.npr = npr  # number of protos
+        if SEG_POSE_INIT_SEGMENT_HEAD:
+            self.attach_segment_head()
+
+        # Copied from Pose
+        self.kpt_shape = kpt_shape  # number of keypoints, number of dims (2 for x,y or 3 for x,y,visible)
+        self.nk = kpt_shape[0] * kpt_shape[1]  # number of keypoints total
+        if SEG_POSE_INIT_POSE_HEAD:
+            self.attach_pose_head()
+
+    def attach_segment_head(self):
+        # Copied from Segment
+        self.proto = Proto(self.ch[0], self.npr, self.nm)  # protos
+        self.detect = Detect.forward
+        c4 = max(self.ch[0] // 4, self.nm)
+        self.cv4s = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nm, 1))
+                                  for x in self.ch)
+
+    def attach_pose_head(self):
+        # Copied from Pose
+        c4 = max(self.ch[0] // 4, self.nk)
+        self.cv4p = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nk, 1))
+                                  for x in self.ch)
+        self.kpts_decode = Pose.kpts_decode
+
+    def forward(self, x):
+        """Perform forward pass through YOLO model and return predictions."""
+        # Copied from Pose
+        bs = x[0].shape[0]  # batch size
+        kpt = torch.cat([self.cv4p[i](x[i]).view(bs, self.nk, -1) for i in range(self.nl)], -1)  # (bs, 17*3, h*w)
+
+        # Copied from Segment
+        p = self.proto(x[0])  # mask protos
+        mc = torch.cat([self.cv4s[i](x[i]).view(bs, self.nm, -1) for i in range(self.nl)], 2)  # mask coefficients
+
+        x = self.detect(self, x)
+
+        if self.training:
+            return x, mc, p, kpt
+        pred_kpt = self.kpts_decode(self, bs, kpt)
+        if self.export:
+            return torch.cat([x, mc, pred_kpt], 1), p
+        else:
+            return torch.cat([x[0], mc, pred_kpt], 1), (x[1], mc, p, kpt)
+
+
 class Classify(nn.Module):
     """YOLOv8 classification head, i.e. x(b,c1,20,20) to x(b,c2)."""
 

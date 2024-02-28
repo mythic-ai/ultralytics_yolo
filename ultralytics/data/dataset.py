@@ -32,12 +32,13 @@ class YOLODataset(BaseDataset):
         (torch.utils.data.Dataset): A PyTorch dataset object that can be used for training an object detection model.
     """
 
-    def __init__(self, *args, data=None, task="detect", **kwargs):
+    def __init__(self, *args, data=None, task="detect", labels_dir="labels", **kwargs):
         """Initializes the YOLODataset with optional configurations for segments and keypoints."""
         self.use_segments = task == "segment"
         self.use_keypoints = task == "pose"
         self.use_obb = task == "obb"
         self.data = data
+        self.labels_dir = labels_dir
         assert not (self.use_segments and self.use_keypoints), "Can not use both segments and keypoints."
         super().__init__(*args, **kwargs)
 
@@ -110,7 +111,7 @@ class YOLODataset(BaseDataset):
 
     def get_labels(self):
         """Returns dictionary of labels for YOLO training."""
-        self.label_files = img2label_paths(self.im_files)
+        self.label_files = img2label_paths(self.im_files, self.labels_dir)
         cache_path = Path(self.label_files[0]).parent.with_suffix(".cache")
         try:
             cache, exists = load_dataset_cache_file(cache_path), True  # attempt to load a *.cache file
@@ -221,6 +222,62 @@ class YOLODataset(BaseDataset):
             new_batch["batch_idx"][i] += i  # add target image index for build_targets()
         new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
         return new_batch
+
+
+class YOLOSegPlusPoseDataset(YOLODataset):
+    """
+    Dataset class for loading object segmentation and Pose estimation labels in YOLO format.
+
+    Args:
+        data (dict, optional): A dataset YAML dictionary. Defaults to None.
+        task (str): An explicit arg to point current task, Defaults to 'detect'.
+
+    Returns:
+        (torch.utils.data.Dataset): A PyTorch dataset object that can be used for training an object detection model.
+    """
+
+    def __init__(self, *args, data=None, task="detect", **kwargs):
+        """Initializes the YOLODataset with optional configurations for segments and keypoints."""
+        # task= "segpose"
+        self.task = task
+        if task == "segpose":
+            self.pose_dataset = YOLODataset(*args, data=data, task="pose", labels_dir="pose-labels", **kwargs)
+
+        super().__init__(*args, data=data, task="segment" if task == "segpose" else task, **kwargs)
+
+    def get_labels(self):
+        """Returns dictionary of labels for YOLO training."""
+        if self.task != "segpose":
+            return super().get_labels()
+
+        seg_labels = super().get_labels()
+        pose_labels = self.pose_dataset.labels
+        pose_labels_dict = {lb["im_file"]: lb for lb in pose_labels}
+        # Remove images that do not have pose labels
+        seg_labels = [lb for lb in seg_labels if lb["im_file"] in pose_labels_dict]
+        self.im_files = [lb["im_file"] for lb in seg_labels]
+
+        def matching_box(box, boxes):
+            """Return the index of the matching box in boxes."""
+            matches = [i for (i, b) in enumerate(boxes) if np.allclose(b, box, atol=1e-5, rtol=0)]
+            assert len(matches) == 1, f"Matching box not found for {box} in {boxes}"
+            return matches[0]
+
+        # Add keypoints to segmentation labels
+        for lb in seg_labels:
+            pose_lb = pose_labels_dict[lb["im_file"]]
+            pose_keypoints = pose_lb["keypoints"]
+            keypoints = np.zeros((len(lb["bboxes"]), *pose_keypoints.shape[1:]), dtype=np.float32)
+            person_idx = [matching_box(b, lb["bboxes"]) for b in pose_lb["bboxes"]]
+            keypoints[person_idx] = pose_keypoints
+            assert np.count_nonzero(lb["cls"][person_idx]) == 0, "Person class should be 0"
+            lb["keypoints"] = keypoints
+            # This is a way to filter out the person labels that don't have keypoints. Use with `classes=[0]`.
+            # cls_0_idx = lb["cls"] == 0
+            # lb["cls"][cls_0_idx] = -1
+            # lb["cls"][person_idx] = 0
+        self.use_keypoints = True
+        return seg_labels
 
 
 # Classification dataloaders -------------------------------------------------------------------------------------------

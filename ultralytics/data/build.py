@@ -22,7 +22,7 @@ from ultralytics.data.loaders import (
 from ultralytics.data.utils import IMG_FORMATS, VID_FORMATS
 from ultralytics.utils import RANK, colorstr
 from ultralytics.utils.checks import check_file
-from .dataset import YOLODataset
+from .dataset import YOLOSegPlusPoseDataset
 from .utils import PIN_MEMORY
 
 
@@ -84,7 +84,7 @@ def seed_worker(worker_id):  # noqa
 
 def build_yolo_dataset(cfg, img_path, batch, data, mode="train", rect=False, stride=32):
     """Build YOLO Dataset."""
-    return YOLODataset(
+    return YOLOSegPlusPoseDataset(
         img_path=img_path,
         imgsz=cfg.imgsz,
         batch_size=batch,

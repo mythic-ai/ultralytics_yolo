@@ -261,6 +261,9 @@ class Exporter:
         }  # model metadata
         if model.task == "pose":
             self.metadata["kpt_shape"] = model.model[-1].kpt_shape
+        elif model.task == "segpose":
+                self.metadata["kpt_shape"] = model.model[-1].kpt_shape
+                self.metadata["nm"] = model.model[-1].nm
 
         LOGGER.info(
             f"\n{colorstr('PyTorch:')} starting from '{file}' with input shape {tuple(im.shape)} BCHW and "
