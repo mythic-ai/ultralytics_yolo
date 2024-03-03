@@ -37,12 +37,15 @@ class SegPoseTrainer(yolo.detect.DetectionTrainer):
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         """Get SegPose estimation model with specified configuration and weights."""
-        model = SegPoseModel(cfg, ch=3, nc=self.data["nc"], data_kpt_shape=self.data["kpt_shape"],
-                             verbose=verbose and RANK == -1)
+        model = self.get_model_class()(cfg, ch=3, nc=self.data["nc"], data_kpt_shape=self.data["kpt_shape"],
+                                       verbose=verbose and RANK == -1)
         if weights:
             model.load(weights)
 
         return model
+
+    def get_model_class(self):
+        return SegPoseModel
 
     def set_model_attributes(self):
         """Sets keypoints shape attribute of PoseModel."""
